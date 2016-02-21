@@ -96,6 +96,16 @@
             logEvent('W,' + sandbox.sid + "," + iid + "," + sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame) + "," + getStringIndex(name) + "," + getValue(val) + "," + getType(val));
         };
 
+        this.literal = function(iid, lit, hasGetterSetter) {
+            if (typeof lit === "object") {
+                var objectId = sandbox.smemory.getIDFromShadowObjectOrFrame(sandbox.smemory.getShadowObjectOfObject(lit));
+                for (key in lit) {
+                    // No hasOwnProperty check required since 'val' has jus been created as a literal
+                    this.putFieldPre(iid, lit, key, lit[key], false, false);
+                }
+            }
+        }
+
         this.functionEnter = function (iid, f, dis, args) {
             var shadowFrame = sandbox.smemory.getShadowFrame('this');
             logEvent('C,'+lastsid+","+lastiid+","+getValue(f)+","+sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame));
