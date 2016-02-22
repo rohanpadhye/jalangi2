@@ -106,6 +106,12 @@
             }
         }
 
+        this.declare = function(iid, name, val, isArgument, argumentIndex, isCatchParam) {
+            var shadowFrame = sandbox.smemory.getShadowFrame('this');
+            var frameId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame);
+            logEvent('D,' + sandbox.sid + "," + iid + "," + frameId + "," + getStringIndex(name) + "," + getValue(val) + "," + getType(val));
+        }
+
         this.functionEnter = function (iid, f, dis, args) {
             var shadowFrame = sandbox.smemory.getShadowFrame('this');
             logEvent('C,'+lastsid+","+lastiid+","+getValue(f)+","+sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame));
