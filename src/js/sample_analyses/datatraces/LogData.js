@@ -43,10 +43,9 @@
         }
 
         function getStringIndex(str) {
-            if (typeof str === "number" && str >= 0) {
-                return str;
+            if (typeof str !== "string") {
+                throw new Error("getStringIndex should only be called for strings")
             }
-            str = str + "";
             if (Object.prototype.hasOwnProperty.call(stringMap, str)) {
                 return stringMap[str];
             } else {
@@ -56,6 +55,19 @@
                 stringList.push(str);
                 return stringIdx;
             }
+        }
+
+        function getOffset(offset) {
+            if (typeof offset === "number") {
+                offset = offset + "";
+            }
+            return getStringIndex(offset);
+            /* 
+            TODO: Handle this separately:
+            if (typeof str === "number" && str >= 0) {
+                return str;
+            }
+            */
         }
 
 
@@ -77,7 +89,7 @@
             var ownerId = shadowObj.owner ? 
                 sandbox.smemory.getIDFromShadowObjectOrFrame(shadowObj.owner) : 0;
             if (shadowObj.isProperty) {
-                logEvent('G,' + sandbox.sid + "," + iid + "," + objectId + "," + ownerId + "," + getStringIndex(offset) + "," + getValue(val) + "," + getType(val));
+                logEvent('G,' + sandbox.sid + "," + iid + "," + objectId + "," + ownerId + "," + getOffset(offset) + "," + getValue(val) + "," + getType(val));
             }
         };
 
@@ -90,7 +102,7 @@
             var ownerId = shadowObj.owner ? 
                 sandbox.smemory.getIDFromShadowObjectOrFrame(shadowObj.owner) : 0;
             if (shadowObj.isProperty) {
-                logEvent('P,' + sandbox.sid + "," + iid + "," + objectId + "," + ownerId + "," + getStringIndex(offset) + "," + getValue(val) + "," + getType(val));
+                logEvent('P,' + sandbox.sid + "," + iid + "," + objectId + "," + ownerId + "," + getOffset(offset) + "," + getValue(val) + "," + getType(val));
             }
         };
 
@@ -115,19 +127,26 @@
         }
 
         this.declare = function(iid, name, val, isArgument, argumentIndex, isCatchParam) {
-            if (isArgument) { // Only log declarations of args
+            if (isArgument) { 
                 var shadowFrame = sandbox.smemory.getShadowFrame(name);
                 var frameId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame);
+                // Log declarations of args with special symbol 'D' to indicate that the write is in the caller
                 if (argumentIndex >= 0) { // Formal parameter
                     logEvent('D,' + sandbox.sid + "," + iid + "," + frameId + "," + getStringIndex(name) + "," + getValue(val) + "," + getType(val));
                 } else { // arguments object
                     var shadowArguments = sandbox.smemory.getShadowObjectOfObject(val);
                     var shadowId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowArguments);
+                    logEvent('D,' + sandbox.sid + "," + iid + "," + frameId + "," + getStringIndex("arguments") + "," + getValue(val) + "," + getType(val));                        
                     for (var i = 0; i < val.length; i++) {
                         var argValue = val[i];
-                        logEvent('D,' + sandbox.sid + "," + iid + "," + shadowId + "," + getStringIndex(i) + "," + getValue(argValue) + "," + getType(argValue));                        
+                        logEvent('D,' + sandbox.sid + "," + iid + "," + shadowId + "," + getOffset(i) + "," + getValue(argValue) + "," + getType(argValue));                        
                     }
                 }
+            } else if (typeof val === "function") {
+                var shadowFrame = sandbox.smemory.getShadowFrame(name);
+                var frameId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame);
+                // Log this as a write, not a declaration because the write is in the callee and not the caller
+                logEvent('W,' + sandbox.sid + "," + iid + "," + frameId + "," + getStringIndex(name) + "," + getValue(val) + "," + getType(val));
             }
         }
 
