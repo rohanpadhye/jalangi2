@@ -21,7 +21,9 @@
                 var shadowObj = sandbox.smemory.getShadowObjectOfObject(v);
                 return sandbox.smemory.getIDFromShadowObjectOrFrame(shadowObj);
             } else if (type === 'string') {
-                return getStringIndex(v);
+                return getStringIndex(v); // @todo: md5(v) if v.length > 32
+            } else if (type === 'undefined') {
+                return '0';
             } else {
                 return v;
             }
@@ -33,20 +35,26 @@
                 return 'O';
             } else if (type === 'string') {
                 return 'S';
+            } else if (type === 'undefined') {
+                return 'U';
             } else {
                 return 'P';
             }
         }
 
         function getStringIndex(str) {
+            if (typeof str === "number" && str >= 0) {
+                return str;
+            }
             str = str + "";
             if (Object.prototype.hasOwnProperty.call(stringMap, str)) {
                 return stringMap[str];
             } else {
                 stringCount++;
-                stringMap[str] = stringCount;
+                var stringIdx = -stringCount;
+                stringMap[str] = stringIdx;
                 stringList.push(str);
-                return stringCount;
+                return stringIdx;
             }
         }
 
@@ -107,9 +115,20 @@
         }
 
         this.declare = function(iid, name, val, isArgument, argumentIndex, isCatchParam) {
-            var shadowFrame = sandbox.smemory.getShadowFrame('this');
-            var frameId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame);
-            logEvent('D,' + sandbox.sid + "," + iid + "," + frameId + "," + getStringIndex(name) + "," + getValue(val) + "," + getType(val));
+            if (isArgument) { // Only log declarations of args
+                var shadowFrame = sandbox.smemory.getShadowFrame(name);
+                var frameId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame);
+                if (argumentIndex >= 0) { // Formal parameter
+                    logEvent('D,' + sandbox.sid + "," + iid + "," + frameId + "," + getStringIndex(name) + "," + getValue(val) + "," + getType(val));
+                } else { // arguments object
+                    var shadowArguments = sandbox.smemory.getShadowObjectOfObject(val);
+                    var shadowId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowArguments);
+                    for (var i = 0; i < val.length; i++) {
+                        var argValue = val[i];
+                        logEvent('D,' + sandbox.sid + "," + iid + "," + shadowId + "," + getStringIndex(i) + "," + getValue(argValue) + "," + getType(argValue));                        
+                    }
+                }
+            }
         }
 
         this.functionEnter = function (iid, f, dis, args) {
