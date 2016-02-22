@@ -97,7 +97,7 @@
         };
 
         this.literal = function(iid, lit, hasGetterSetter) {
-            if (typeof lit === "object") {
+            if (typeof lit === "object" && lit !== null) {
                 var objectId = sandbox.smemory.getIDFromShadowObjectOrFrame(sandbox.smemory.getShadowObjectOfObject(lit));
                 for (key in lit) {
                     // No hasOwnProperty check required since 'val' has jus been created as a literal
