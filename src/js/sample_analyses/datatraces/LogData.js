@@ -76,6 +76,27 @@
             lastsid = sandbox.sid;
         };
 
+        this.invokeFun = function (iid, f, base, args, result, isConstructor, isMethod, functionIid) {
+            if (isConstructor) {
+                if (f === Array) {
+                    this.writeProp(iid, result, "length");
+                } else if (f === Function) {
+                    this.writeProp(iid, result, "name");
+                    this.writeProp(iid, result, "length");   
+                    this.writeProp(iid, result, "prototype");                  
+                } 
+            } else if (f === Object.defineProperty) {
+                // TODO: init defined property
+            } else if (f === Object.defineProperties) {
+                // TODO: init defined properties
+            } else if (isMethod && Array.isArray(base)) {
+                // TODO: Handle array methods that change storage
+            }
+
+            // TODO: Forward invocations of the type foo.call(x, y) to x.foo(y) 
+
+        }
+
 
         this.getFieldPre = function (iid, base, offset, isComputed, isOpAssign, isMethodCall) {
             lastiid = iid;
@@ -116,6 +137,17 @@
             logEvent('W,' + sandbox.sid + "," + iid + "," + sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame) + "," + getStringIndex(name) + "," + getValue(val) + "," + getType(val));
         };
 
+        this.writeProp = function(iid, obj, prop) {
+            this.putFieldPre(iid, obj, prop, obj[prop], false, false);
+        }
+
+        this.initArray = function(iid, arr) {
+            this.writeProp(iid, arr, "length");
+            for (var i = 0; i < arr.length; i++) {
+                this.writeProp(iid, arr, i);
+            }
+        }
+
         this.literal = function(iid, lit, hasGetterSetter) {
             if (typeof lit === "object" && lit !== null) {
                 var objectId = sandbox.smemory.getIDFromShadowObjectOrFrame(sandbox.smemory.getShadowObjectOfObject(lit));
@@ -123,6 +155,14 @@
                     // No hasOwnProperty check required since 'val' has jus been created as a literal
                     this.putFieldPre(iid, lit, key, lit[key], false, false);
                 }
+                if (Array.isArray(lit)) {
+                    this.writeProp(iid, lit, "length");
+                }
+            }
+            if (typeof lit === "function") {                          
+                this.writeProp(iid, lit, "name");          
+                this.writeProp(iid, lit, "length");          
+                this.writeProp(iid, lit, "prototype");
             }
         }
 
@@ -147,12 +187,20 @@
                 var frameId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame);
                 // Log this as a write, not a declaration because the write is in the callee and not the caller
                 logEvent('W,' + sandbox.sid + "," + iid + "," + frameId + "," + getStringIndex(name) + "," + getValue(val) + "," + getType(val));
+                // Initialize properties of function                
+                this.writeProp(iid, val, "name");          
+                this.writeProp(iid, val, "length");          
+                this.writeProp(iid, val, "prototype");
             }
         }
 
         this.functionEnter = function (iid, f, dis, args) {
             var shadowFrame = sandbox.smemory.getShadowFrame('this');
-            logEvent('C,'+lastsid+","+lastiid+","+getValue(f)+","+sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame));
+            var frameId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame);
+            // First, log the function call
+            logEvent('C,'+lastsid+","+lastiid+","+getValue(f)+","+frameId);
+            // Then, declare the write of "this" before moving to declaring args and function declarations (see the 'declare' callback)
+            logEvent('D,'+lastsid+","+lastiid+"," + frameId + "," + getStringIndex("this") + "," + getValue(dis) + "," + getType(dis));
         };
 
         this.functionExit = function (iid, returnVal, wrappedExceptionVal) {
