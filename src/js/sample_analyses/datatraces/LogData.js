@@ -71,26 +71,110 @@
         }
 
 
+        // Handle native functions that read objects in pre, since callbacks may modify the data itself
         this.invokeFunPre = function (iid, f, base, args, isConstructor, isMethod, functionIid) {
             lastiid = iid;
             lastsid = sandbox.sid;
+            if (isMethod && Array.isArray(base)) {
+                var arr, params;
+                // Array methods can be called as a.foo(..) or Array.prototype.foo(a, ...)
+                if (base === Array.prototype) {
+                    arr = args[0];
+                    params = Array.prototype.slice.call(args, 1);
+                } else {
+                    arr = base;
+                    params = Array.prototype.slice.call(args, 0);
+                }
+
+                // Methods that (mostly) read the base array
+                if (f === Array.prototype.concat || 
+                    f === Array.prototype.entries ||
+                    f === Array.prototype.every ||
+                    f === Array.prototype.filter ||
+                    f === Array.prototype.find ||      // may read partially, but is O(n) traversal
+                    f === Array.prototype.findIndex || // ditto
+                    f === Array.prototype.some ||      // ditto
+                    f === Array.prototype.forEach ||
+                    f === Array.prototype.include ||
+                    f === Array.prototype.indexOf ||
+                    f === Array.prototype.join ||
+                    f === Array.prototype.filter ||
+                    f === Array.prototype.lastIndexOf ||
+                    f === Array.prototype.map ||
+                    f === Array.prototype.reduce ||
+                    f === Array.prototype.reduceRight ||
+                    f === Array.prototype.reverse ||
+                    f === Array.prototype.sort ||  
+                    f === Array.prototype.toLocaleString ||
+                    f === Array.prototype.toString ||
+                    f === Array.prototype.values ) {
+                    //this.readProp(iid, arr, "length");
+                    this.readOwnProps(iid, arr);      
+                }
+            }
         };
 
+        // Handle native functions that write objects in post, since they often deal with returned values
         this.invokeFun = function (iid, f, base, args, result, isConstructor, isMethod, functionIid) {
             if (isConstructor) {
                 if (f === Array) {
-                    this.writeProp(iid, result, "length");
+                    //this.writeProp(iid, result, "length");
+                    this.writeOwnProps(iid, result);
                 } else if (f === Function) {
                     this.writeProp(iid, result, "name");
                     this.writeProp(iid, result, "length");   
                     this.writeProp(iid, result, "prototype");                  
                 } 
+            } else if (f === Array.from || f === Array.of) { 
+                this.writeProp(iid, result, "length");
+                this.writeOwnProps(iid, result);                
+            } else if (isMethod && Array.isArray(base)) {
+                var arr, params;
+                // Array methods can be called as a.foo(..) or Array.prototype.foo(a, ...)
+                if (base === Array.prototype) {
+                    arr = args[0];
+                    params = Array.prototype.slice.call(args, 1);
+                } else {
+                    arr = base;
+                    params = Array.prototype.slice.call(args, 0);
+                }
+                // Methods that return a (mostly) written array
+                if (f === Array.prototype.concat ||
+                    f === Array.prototype.slice || 
+                    f === Array.prototype.splice // Both writes base and result (base handled below) 
+                    ) {
+                    //this.writeProp(iid, result, "length");
+                    this.writeOwnProps(iid, result);                    
+                } else
+                // Methods that (mostly) modify the base array
+                if (f === Array.prototype.copyWithin ||
+                    f === Array.prototype.fill ||    // Over-approximate partial fill
+                    f === Array.prototype.reverse ||
+                    f === Array.prototype.shift ||   // Values at all indexes are modified
+                    f === Array.prototype.sort || 
+                    f === Array.prototype.splice ||  // Change may be partial but is O(n) at most so over-approx
+                    f === Array.prototype.unshift // Similar to shift
+                    ) {
+                    //this.writeProp(iid, arr, "length");
+                    this.writeOwnProps(iid, arr);          
+                } else 
+                // Special handling for push/pop since they are so common
+                if (f === Array.prototype.pop) {
+                    //this.readProp(iid, arr, "length")
+                    this.readProp(iid, arr, arr["length"])
+                    this.writeProp(iid, arr, "length")
+                } else if (f === Array.prototype.push) {
+                    //this.writeProp(iid, arr, "length")
+                    var idx = arr["length"] - 1, elems = params.length;
+                    while (elems--) {
+                        this.writeProp(iid, arr, idx--);
+                    }
+                }
+            
             } else if (f === Object.defineProperty) {
                 // TODO: init defined property
             } else if (f === Object.defineProperties) {
                 // TODO: init defined properties
-            } else if (isMethod && Array.isArray(base)) {
-                // TODO: Handle array methods that change storage
             }
 
             // TODO: Forward invocations of the type foo.call(x, y) to x.foo(y) 
@@ -141,10 +225,22 @@
             this.putFieldPre(iid, obj, prop, obj[prop], false, false);
         }
 
-        this.initArray = function(iid, arr) {
-            this.writeProp(iid, arr, "length");
-            for (var i = 0; i < arr.length; i++) {
-                this.writeProp(iid, arr, i);
+        this.writeOwnProps = function(iid, obj) {
+            for (prop in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, prop)) {
+                    this.writeProp(iid, obj, prop);
+                }
+            }
+        }
+        this.readProp = function(iid, obj, prop) {
+            this.getField(iid, obj, prop, obj[prop], false, false);
+        }
+
+        this.readOwnProps = function(iid, obj) {
+            for (prop in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, prop)) {
+                    this.readProp(iid, obj, prop);
+                }
             }
         }
 
@@ -156,7 +252,7 @@
                     this.putFieldPre(iid, lit, key, lit[key], false, false);
                 }
                 if (Array.isArray(lit)) {
-                    this.writeProp(iid, lit, "length");
+                    //this.writeProp(iid, lit, "length");
                 }
             }
             if (typeof lit === "function") {                          
@@ -200,7 +296,7 @@
             // First, log the function call
             logEvent('C,'+lastsid+","+lastiid+","+getValue(f)+","+frameId);
             // Then, declare the write of "this" before moving to declaring args and function declarations (see the 'declare' callback)
-            logEvent('D,'+lastsid+","+lastiid+"," + frameId + "," + getStringIndex("this") + "," + getValue(dis) + "," + getType(dis));
+            logEvent('D,'+sandbox.sid+","+iid+"," + frameId + "," + getStringIndex("this") + "," + getValue(dis) + "," + getType(dis));
         };
 
         this.functionExit = function (iid, returnVal, wrappedExceptionVal) {
