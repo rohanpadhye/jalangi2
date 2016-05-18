@@ -1,6 +1,14 @@
 
 (function (sandbox) {
-    function MyAnalysis() {
+
+    function loc(iid) {
+      var sid = sandbox.sid;
+      var fileName = sandbox.smap[sid]["originalCodeFileName"];
+      var lineNumber = sandbox.smap[sid][iid];
+      return fileName + ":" + lineNumber;
+    }
+
+    function LogData() {
         var stringMap = {};
         var stringList = [];
         var stringCount = 0;
@@ -44,7 +52,7 @@
 
         function getStringIndex(str) {
             if (typeof str !== "string") {
-                throw new Error("getStringIndex should only be called for strings")
+                throw new Error("getStringIndex should only be called for strings, not " + (typeof str))
             }
             if (Object.prototype.hasOwnProperty.call(stringMap, str)) {
                 return stringMap[str];
@@ -57,17 +65,9 @@
             }
         }
 
-        function getOffset(offset) {
-            if (typeof offset === "number") {
-                offset = offset + "";
-            }
-            return getStringIndex(offset);
-            /* 
-            TODO: Handle this separately:
-            if (typeof str === "number" && str >= 0) {
-                return str;
-            }
-            */
+        function getOffset(key) {
+            key = key + "";
+            return getStringIndex(key);
         }
 
 
@@ -195,13 +195,19 @@
             } else if (f === Object.defineProperty && args.length >= 2) {
                 var obj = args[0];
                 var prop = args[1];
-                this.writeProp(iid, obj, prop);
+                // Property has a value if no descriptor or descriptor with value is provided
+                if (args.length == 2 || "value" in args[2]) {
+                  this.writeProp(iid, obj, prop);
+                }
             } else if (f === Object.defineProperties && args.length >= 2) {
                 var obj = args[0];
                 var props = args[1];
                 for (k in Object.keys(props)) {
-                    var prop = props[k];
-                    this.writeProp(iid, obj, prop);
+                    var prop = k;
+                    var desc = props[k];
+                    if ("value" in desc) {
+                      this.writeProp(iid, obj, prop);
+                    }
                 }
             } else if (args.length >= 1 && (
                 true)) {
@@ -224,6 +230,7 @@
             var shadowObj = sandbox.smemory.getShadowObject(base, offset, true);
             var ownerId = shadowObj.owner ? 
                 sandbox.smemory.getIDFromShadowObjectOrFrame(shadowObj.owner) : 0;
+            var v = getValue(val);
             if (shadowObj.isProperty) {
                 logEvent('G,' + sandbox.sid + "," + iid + "," + objectId + "," + ownerId + "," + getOffset(offset) + "," + getValue(val) + "," + getType(val));
             }
@@ -363,7 +370,7 @@
         };
     }
 
-    sandbox.analysis = new MyAnalysis();
+    sandbox.analysis = new LogData();
 })(J$);
 
 
