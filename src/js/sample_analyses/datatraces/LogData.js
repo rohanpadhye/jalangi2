@@ -1,3 +1,4 @@
+var fs = require('fs');
 
 (function (sandbox) {
 
@@ -18,9 +19,16 @@
         var traceWriter = new sandbox.TraceWriter("trace.log")
         //var logs = [];
 
+        var bufferedLogs = 0;
+        var MAX_BUFFERED_LOGS = 1024 * 1000;
+
         function logEvent(str) {
             traceWriter.logToFile(str+"\n");
-            //@todo dump and clear the logs array once its size exceeds some constant, say 1024
+            bufferedLogs++;
+            if (bufferedLogs > MAX_BUFFERED_LOGS) {
+                traceWriter.flush();
+                bufferedLogs = 0;
+            }
         }
 
         function getValue(v) {
@@ -341,15 +349,6 @@
             logEvent('E,' + sandbox.sid + "," + iid + "," + getValue(returnVal) + "," + getType(returnVal));
         };
 
-        this.endExecution = function () {
-            traceWriter.stopTracing();
-            var tw = new sandbox.TraceWriter("strings.json");
-            tw.logToFile(JSON.stringify(stringList)+"\n");
-            tw.stopTracing();
-            tw = new sandbox.TraceWriter("smap.json");
-            tw.logToFile(JSON.stringify(sandbox.smap)+"\n");
-            tw.stopTracing();
-        };
 
         this.runInstrumentedFunctionBody = function (iid, f, functionIid) {
             return false;
@@ -368,6 +367,15 @@
         this.onReady = function (cb) {
             cb();
         };
+        
+        /**
+         * in node.js endExecution() is called too early (Jalangi bug?) so we register a process exit call-back.
+         */
+        process.on('exit', function () {
+            traceWriter.stopTracing();
+            fs.writeFileSync('strings.json', JSON.stringify(stringList)+'\n');
+            fs.writeFileSync('smap.json', JSON.stringify(sandbox.smap)+'\n');
+        });
     }
 
     sandbox.analysis = new LogData();
