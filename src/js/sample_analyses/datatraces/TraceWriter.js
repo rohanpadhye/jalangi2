@@ -17,7 +17,7 @@
         // so don't record any more events
         var tracingDone = false;
 
-        function getFileHanlde() {
+        function getFileHandle() {
             if (traceWfh === undefined) {
                 traceWfh = fs.openSync(traceFileName, 'w');
             }
@@ -54,7 +54,7 @@
             if (!Constants.isBrowser) {
                 var length = buffer.length;
                 for (var i = 0; i < length; i++) {
-                    fs.writeSync(getFileHanlde(), buffer[i]);
+                    fs.writeSync(getFileHandle(), buffer[i]);
                 }
             } else {
                 msg = buffer.join('');
