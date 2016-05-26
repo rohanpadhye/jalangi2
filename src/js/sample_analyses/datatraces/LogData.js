@@ -1,4 +1,5 @@
 var fs = require('fs');
+var path = require('path');
 
 (function (sandbox) {
 
@@ -9,6 +10,7 @@ var fs = require('fs');
       return fileName + ":" + lineNumber;
     }
 
+
     function LogData() {
         var stringMap = {};
         var stringList = [];
@@ -16,19 +18,41 @@ var fs = require('fs');
         var lastiid = -1;
         var lastsid = -1;
 
-        var traceWriter = new sandbox.TraceWriter("trace.log")
-        //var logs = [];
-
-        var bufferedLogs = 0;
-        var MAX_BUFFERED_LOGS = 1024 * 1000;
+        var traceWriter;
+        var isDriver;  // Function -> Boolean (true if given function is the driver)
+        var traceName; // [Args] -> String    (name of a new trace; given the arguments of the driver function)
 
         function logEvent(str) {
-            traceWriter.logToFile(str+"\n");
-            bufferedLogs++;
-            if (bufferedLogs > MAX_BUFFERED_LOGS) {
-                traceWriter.flush();
-                bufferedLogs = 0;
+            if (traceWriter) {
+                traceWriter.logToFile(str+"\n");
             }
+        }
+
+        function endCurrentTrace() {
+            if (traceWriter) {
+                traceWriter.stopTracing();
+                traceWriter = null;
+            }
+        }
+
+        function newTrace(name) {
+            if (traceWriter) {
+                endCurrentTrace();
+            }
+            filename = name ? "trace-"+name+".log" : "trace.log"
+            traceWriter = new sandbox.TraceWriter(filename);
+        }
+
+        if(sandbox.initParams['driver']) {
+            var driver = sandbox.initParams['driver'];
+            if (driver == 'nodeunit') {
+                var progDir = sandbox.initParams['progDir'] || path.resolve(path.dirname(sandbox.script));
+                var nodeunit = require(progDir + '/node_modules/nodeunit');
+                isDriver = function(f) { return f == nodeunit.runTest } 
+
+            }
+        } else {
+            newTrace();
         }
 
         function getValue(v) {
@@ -84,6 +108,11 @@ var fs = require('fs');
             lastiid = iid;
             lastsid = sandbox.sid;
 
+            // If there is no current trace and there is a defined driver then check if we are entering the driver
+            if (!traceWriter && isDriver && isDriver(f)) {
+                newTrace(traceName(args));
+            }
+
             // If f is Function.prototype.call or Function.prototype.apply, then forward to the called function
             if (isMethod && f === Function.prototype.call) {
                 var func = base;
@@ -137,6 +166,10 @@ var fs = require('fs');
 
         // Handle native functions that write objects in post, since they often deal with returned values
         this.invokeFun = function (iid, f, base, args, result, isConstructor, isMethod, functionIid) {
+            // If there is a current trace and there is a defined driver then check if we are exiting the driver
+            if (traceWriter && isDriver && isDriver(f)) {
+                endCurrentTrace();
+            }
 
             // If f is Function.prototype.call or Function.prototype.apply, then forward to the called function
             if (isMethod && f === Function.prototype.call) {
@@ -372,7 +405,7 @@ var fs = require('fs');
          * in node.js endExecution() is called too early (Jalangi bug?) so we register a process exit call-back.
          */
         process.on('exit', function () {
-            traceWriter.stopTracing();
+            endCurrentTrace();
             fs.writeFileSync('strings.json', JSON.stringify(stringList)+'\n');
             fs.writeFileSync('smap.json', JSON.stringify(sandbox.smap)+'\n');
         });

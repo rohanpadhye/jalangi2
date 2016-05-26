@@ -111,6 +111,8 @@ Module._extensions['.js'] = function (module, filename) {
 function startProgram() {
     // hack process.argv for the child script
     script = path.resolve(script);
+    // Save script path in global in case an analysis needs it
+    J$.script = script
     var newArgs = [process.argv[0], script];
     newArgs = newArgs.concat(args.script_and_args);
     process.argv = newArgs;
