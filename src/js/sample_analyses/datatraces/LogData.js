@@ -243,20 +243,16 @@ var path = require('path');
             } else if (f === Object.defineProperties && args.length >= 2) {
                 var obj = args[0];
                 var props = args[1];
-                for (k in Object.keys(props)) {
-                    var prop = k;
-                    var desc = props[k];
-                    if ("value" in desc) {
-                      this.writeProp(iid, obj, prop);
+                for (k in props) {
+                    if (Object.prototype.hasOwnProperty(props, k)) {
+                        var prop = k;
+                        var desc = props[k];
+                        if ("value" in desc) {
+                          this.writeProp(iid, obj, prop);
+                        }
                     }
                 }
-            } else if (args.length >= 1 && (
-                true)) {
-
-            }
-
-            // TODO: Forward invocations of the type foo.call(x, y) to x.foo(y) 
-
+            } 
         }
 
 
@@ -373,7 +369,7 @@ var path = require('path');
             var shadowFrame = sandbox.smemory.getShadowFrame('this');
             var frameId = sandbox.smemory.getIDFromShadowObjectOrFrame(shadowFrame);
             // First, log the function call
-            logEvent('C,'+lastsid+","+lastiid+","+getValue(f)+","+frameId);
+            logEvent('C,'+lastsid+","+lastiid+","+sandbox.sid+","+iid+","+getValue(f)+","+frameId);
             // Then, declare the write of "this" before moving to declaring args and function declarations (see the 'declare' callback)
             logEvent('D,'+sandbox.sid+","+iid+"," + frameId + "," + getStringIndex("this") + "," + getValue(dis) + "," + getType(dis));
         };
