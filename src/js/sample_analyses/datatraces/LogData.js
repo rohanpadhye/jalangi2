@@ -64,6 +64,8 @@ var path = require('path');
                 return getStringIndex(v); // @todo: md5(v) if v.length > 32
             } else if (type === 'undefined') {
                 return '0';
+            } else if (type === 'symbol') { 
+                return getStringIndex(v.toString());
             } else {
                 return v;
             }
@@ -98,7 +100,7 @@ var path = require('path');
         }
 
         function getOffset(key) {
-            key = key + "";
+            key = key && key.toString() || (key + "");
             return getStringIndex(key);
         }
 
@@ -323,8 +325,10 @@ var path = require('path');
             if (typeof lit === "object" && lit !== null) {
                 var objectId = sandbox.smemory.getIDFromShadowObjectOrFrame(sandbox.smemory.getShadowObjectOfObject(lit));
                 for (key in lit) {
-                    // No hasOwnProperty check required since 'val' has jus been created as a literal
-                    this.putFieldPre(iid, lit, key, lit[key], false, false);
+                    // Generate a "write" event only if the property is a data-field (i.e. not getter or setter)
+                    if (Object.prototype.hasOwnProperty.call(lit, key) && ('value' in Object.getOwnPropertyDescriptor(lit, key))) {
+                        this.putFieldPre(iid, lit, key, lit[key], false, false);
+                    }
                 }
                 if (Array.isArray(lit)) {
                     //this.writeProp(iid, lit, "length");
