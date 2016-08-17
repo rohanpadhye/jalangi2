@@ -222,7 +222,7 @@ var path = require('path');
                 // Special handling for push/pop since they are so common
                 if (f === Array.prototype.pop) {
                     //this.readProp(iid, arr, "length")
-                    this.readProp(iid, arr, arr["length"])
+                    this.readProp(iid, arr, "length")
                     this.writeProp(iid, arr, "length")
                 } else if (f === Array.prototype.push) {
                     //this.writeProp(iid, arr, "length")
