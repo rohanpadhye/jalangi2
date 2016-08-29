@@ -20,7 +20,7 @@ In the Jalangi2 distribution you will find several analyses:
 We tested Jalangi on Mac OS X 10.10 with Chromium browser.  Jalangi should work on Mac OS
 10.7, Ubuntu 11.0 and higher and Windows 7 or higher. Jalangi will NOT work with IE.
 
-  * Node.js v0.10.x available at https://nodejs.org/en/download/releases/.  We have tested Jalangi with Node v0.10.33.
+  * Node.js v4.4.5 available at https://nodejs.org/en/download/releases/.  We have tested Jalangi with Node v4.4.5.
   * Chrome browser if you need to test web apps.
   * Python (http://python.org) version 2.7 or higher and less than 3.0.
 
@@ -47,6 +47,7 @@ Clone the repository, and then run:
 
 ### Run tests
 
+    python scripts/test.traceall.py
     python scripts/test.analysis.py
     python scripts/test.dlint.py
 
@@ -56,16 +57,35 @@ Clone the repository, and then run:
 
 An analysis can be performed on a JavaScript file in node.js by issuing the following commands:
 
-	node src/js/commands/jalangi.js --inlineIID --inlineSource --analysis src/js/sample_analyses/ChainedAnalyses.js --analysis src/js/sample_analyses/dlint/Utils.js --analysis src/js/sample_analyses/dlint/CheckNaN.js --analysis src/js/sample_analyses/dlint/FunCalledWithMoreArguments.js --analysis src/js/sample_analyses/dlint/CompareFunctionWithPrimitives.js --analysis src/js/sample_analyses/dlint/ShadowProtoProperty.js --analysis src/js/sample_analyses/dlint/ConcatUndefinedToString.js --analysis src/js/sample_analyses/dlint/UndefinedOffset.js tests/octane/deltablue.js
+    node src/js/commands/jalangi.js --inlineIID --inlineSource --analysis src/js/sample_analyses/ChainedAnalyses.js --analysis src/js/sample_analyses/dlint/Utils.js --analysis src/js/sample_analyses/dlint/CheckNaN.js --analysis src/js/sample_analyses/dlint/FunCalledWithMoreArguments.js --analysis src/js/sample_analyses/dlint/CompareFunctionWithPrimitives.js --analysis src/js/sample_analyses/dlint/ShadowProtoProperty.js --analysis src/js/sample_analyses/dlint/ConcatUndefinedToString.js --analysis src/js/sample_analyses/dlint/UndefinedOffset.js tests/octane/deltablue.js
 
-In the above analysis, we chained several analyses by including *--analysis src/js/analyses/ChainedAnalyses.js*.
+In the above analysis, we chained several analyses by including *--analysis src/js/analyses/ChainedAnalyses.js* as the first analysis.
+The command runs the following analyses
+
+    src/js/sample_analyses/dlint/CheckNaN.js
+    src/js/sample_analyses/dlint/FunCalledWithMoreArguments.js
+    src/js/sample_analyses/dlint/CompareFunctionWithPrimitives.js
+    src/js/sample_analyses/dlint/ShadowProtoProperty.js
+    src/js/sample_analyses/dlint/ConcatUndefinedToString.js
+    src/js/sample_analyses/dlint/UndefinedOffset.js
+
+The implementation of an analysis requires the implementation of several callback functions. One can start writing
+an writing analysis using the template file [src/js/runtime/analysisCallbackTemplate.js](src/js/runtime/analysisCallbackTemplate.js).
+A documentation of these call back functions can be found at [docs/MyAnalysis.html](docs/MyAnalysis.html).
+A tutorial on writing a Jalangi analysis can be found at [docs/tutorial1.md](docs/tutorial1.md). While writing 
+an analysis one could run [src/js/sample_analyses/pldi16/TraceAll.js](src/js/sample_analyses/pldi16/TraceAll.js) 
+analysis on a JavaScript file to print all the callback functions that got 
+called during the execution of the file.  Such a trace is useful to see what callbacks get called during an 
+execution.  The following command runs the TraceAll.js analysis on the file [tests/octane/deltablue.js](tests/octane/deltablue.js).
+
+    node src/js/commands/jalangi.js --inlineIID --inlineSource --analysis src/js/sample_analyses/ChainedAnalyses.js --analysis src/js/runtime/SMemory.js --analysis src/js/sample_analyses/pldi16/TraceAll.js tests/octane/deltablue.js
 
 **Analysis in node.js with explicit one-file-at-a-time offline instrumentation**
 
 An analysis can be performed on a JavaScript file in node.js by issuing the following commands:
 
     node src/js/commands/esnstrument_cli.js --inlineIID --inlineSource tests/octane/deltablue.js
-	node src/js/commands/direct.js --analysis src/js/sample_analyses/ChainedAnalyses.js --analysis src/js/sample_analyses/dlint/Utils.js --analysis src/js/sample_analyses/dlint/CheckNaN.js --analysis src/js/sample_analyses/dlint/FunCalledWithMoreArguments.js --analysis src/js/sample_analyses/dlint/CompareFunctionWithPrimitives.js --analysis src/js/sample_analyses/dlint/ShadowProtoProperty.js --analysis src/js/sample_analyses/dlint/ConcatUndefinedToString.js --analysis src/js/sample_analyses/dlint/UndefinedOffset.js tests/octane/deltablue_jalangi_.js
+    node src/js/commands/direct.js --analysis src/js/sample_analyses/ChainedAnalyses.js --analysis src/js/sample_analyses/dlint/Utils.js --analysis src/js/sample_analyses/dlint/CheckNaN.js --analysis src/js/sample_analyses/dlint/FunCalledWithMoreArguments.js --analysis src/js/sample_analyses/dlint/CompareFunctionWithPrimitives.js --analysis src/js/sample_analyses/dlint/ShadowProtoProperty.js --analysis src/js/sample_analyses/dlint/ConcatUndefinedToString.js --analysis src/js/sample_analyses/dlint/UndefinedOffset.js tests/octane/deltablue_jalangi_.js
 
 In the above analysis, we chained several analyses by including *--analysis src/js/analyses/ChainedAnalyses.js*.
 
@@ -81,28 +101,27 @@ While performing analysis in a browser, one needs to press Alt-Shift-T to end th
 **Analysis in a browser using a proxy and on-the-fly instrumentation**
 
 You can also setup a proxy to instrument JavaScript files on-the-fly.  To do so, you need to install [mitmproxy](http://mitmproxy.org/)
-and [mitmproxy CA](http://mitmproxy.org/doc/ssl.html).  Then you can run the Jalangi instrumentation proxy by giving the following
-commands:
+and [mitmproxy CA](http://mitmproxy.org/doc/ssl.html).  Then you can run the Jalangi instrumentation proxy by issuing the following
+command:
 
-    mkdir tmp
-    cd tmp
-    mitmdump -q --anticache -s "../scripts/proxy.py --analysis ../src/js/sample_analyses/ChainedAnalyses.js --analysis ../src/js/runtime/analysisCallbackTemplate.js"
+    mitmdump --quiet --anticache -s "scripts/proxy.py --inlineIID --inlineSource --analysis src/js/sample_analyses/ChainedAnalyses.js --analysis src/js/runtime/analysisCallbackTemplate.js"
 
-In your browser, the http and https proxy should be set to 127.0.0.1:8080.  Now if you load a website in your browser, all JavaScript files associated with
-the website will get instrumented on-the-fly.
+In your browser, the http and https proxy should be set to 127.0.0.1:8080.  Now if you load a website in your browser, all JavaScript files associated with the website will get instrumented on-the-fly.
 
-On a mac, proxy can be set and launched automatically by giving the following commands:
+On a mac, the proxy can be set and launched automatically by issuing the following command:
 
-    mkdir tmp
-    cd tmp
-    ../scripts/mitmproxywrapper.py -t -q --anticache -s "../scripts/proxy.py --analysis ../src/js/sample_analyses/ChainedAnalyses.js --analysis ../src/js/runtime/analysisCallbackTemplate.js"
+    ./scripts/mitmproxywrapper.py --toggle --auto-disable --quiet --anticache -s "scripts/proxy.py --inlineIID --inlineSource --analysis src/js/sample_analyses/ChainedAnalyses.js --analysis src/js/runtime/analysisCallbackTemplate.js"
 
-The proxy can be disabled by re-executing the last command. The last command enables proxy and starts the mitmproxy if the proxy is not currently enabled.
-If the proxy is currently enabled, the command disables the proxy.
+The command starts mitmproxy if the proxy is not currently enabled, and disables it otherwise.
+The `--auto-disable` option will automatically disable the proxy when the script is interrupted.
+
+Jalangi2 caches the instrumented source files in `./cache/`.
+The use of the cache can be disabled during development by passing the `--no-cache` flag to `scripts/proxy.py`.
 
 ### Developing an analysis in Jalangi2
 
-Refer to [docs/index.html](docs/index.html) and [docs/commands.md](docs/commands.md) for further information.
+Refer to [docs/index.html](docs/index.html) and [docs/commands.md](docs/commands.md) for further information.  A tutorial
+on writing a Jalangi analysis can be found in [docs/tutorial1.md](docs/tutorial1.md).  
 
 ### Supported ECMAScript versions
 

@@ -17,6 +17,7 @@ var path = require('path');
         var stringCount = 0;
         var lastiid = -1;
         var lastsid = -1;
+        var HOP = sandbox.Constants.HOP;
 
         var traceWriter;
         var isDriver;  // Function -> Boolean (true if given function is the driver)
