@@ -151,11 +151,16 @@
          * Note that a shadow object cannot be associated with a primitive value: number, string, boolean, undefined, or null.
          */
         this.getShadowObjectOfObject = function (val) {
+            if (val === process.env) {
+              return shadowEnv;
+            }
             var value;
             createShadowObject(val);
             var type = typeof val;
             if ((type === 'object' || type === 'function') && val !== null && HOP(val, SPECIAL_PROP_SOBJECT)) {
-                value = val[SPECIAL_PROP_SOBJECT];
+                if (typeof val[SPECIAL_PROP_SOBJECT] === 'object') { 
+                  value = val[SPECIAL_PROP_SOBJECT];
+                }
             } else {
                 value = undefined;
             }
@@ -218,24 +223,6 @@
             }
 
         }
-
-        this.getShadowObjectOfObject = function (val) {
-            if (val === process.env) {
-              return shadowEnv;
-            }
-            var value;
-            createShadowObject(val);
-            var type = typeof val;
-            if ((type === 'object' || type === 'function') && val !== null && HOP(val, SPECIAL_PROP_SOBJECT)) {
-                if (typeof val[SPECIAL_PROP_SOBJECT] === 'object') { // FIXME: Works around corrupted shadow objects
-                  value = val[SPECIAL_PROP_SOBJECT];
-                }
-            } else {
-                value = undefined;
-            }
-            return value;
-        };
-
 
         this.defineFunction = function (f) {
             if (typeof f === 'function') {
